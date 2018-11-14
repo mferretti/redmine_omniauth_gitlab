@@ -16,4 +16,5 @@ Redmine::Plugin.register :redmine_omniauth_gitlab do
     :oauth_autentification => false,
     :allowed_domains => ""
   }, :partial => 'settings/gitlab_settings'
+
 end

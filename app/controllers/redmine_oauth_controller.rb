@@ -6,7 +6,7 @@ class RedmineOauthController < AccountController
   include Helpers::Checker
 
   def oauth_gitlab
-    if Setting.plugin_redmine_omniauth_gitlab[:oauth_authentification]
+    if Setting.plugin_redmine_omniauth_gitlab['oauth_authentification']
       session[:back_url] = params[:back_url]
       redirect_to oauth_client.auth_code.authorize_url(:redirect_uri => oauth_gitlab_callback_url)
     else
@@ -20,18 +20,22 @@ class RedmineOauthController < AccountController
       redirect_to signin_path
     else
       token = oauth_client.auth_code.get_token(params[:code], :redirect_uri => oauth_gitlab_callback_url)
-      result = token.get( settings[:site]+'/api/v3/user')
+      result = token.get( Setting.plugin_redmine_omniauth_gitlab['site']+'/api/v3/user')
       info = JSON.parse(result.body)
       puts(info)
       puts("email : " + info["email"])
       if info && info["email"]
-        if allowed_domain_for?(info["email"])
-          try_to_login info
+        allowed_domain_for = Setting.plugin_redmine_omniauth_gitlab['allowed_domains']
+        current_domain = parse_email(info["email"])[:domain]
+        Rails.logger.info 'the current domain is '+ current_domain
+        Rails.logger.info 'the allowed domains are ' + allowed_domain_for.inspect
+        if allowed_domain_for.to_s.empty? or allowed_domain_for.include?(current_domain)   
+            try_to_login info
         else
           flash[:error] = l(:notice_domain_not_allowed, :domain => parse_email(info["email"])[:domain])
           redirect_to signin_path
         end
-      else
+    else
         flash[:error] = l(:notice_unable_to_obtain_gitlab_credentials)
         redirect_to signin_path
       end
@@ -85,12 +89,13 @@ class RedmineOauthController < AccountController
   end
 
   def oauth_client
-    @client ||= OAuth2::Client.new(settings[:client_id], settings[:client_secret],
+    @client ||= OAuth2::Client.new(Setting.plugin_redmine_omniauth_gitlab['client_id'], Setting.plugin_redmine_omniauth_gitlab['client_secret'],
                                    :token_method => :post,
-                                   :site => settings[:site],
-                                   :authorize_url => settings[:site] + '/oauth/authorize',
-                                   :token_url => settings[:site] + '/oauth/token'
+                                   :site => Setting.plugin_redmine_omniauth_gitlab['site'],
+                                   :authorize_url => Setting.plugin_redmine_omniauth_gitlab['site'] + '/oauth/authorize',
+                                   :token_url => Setting.plugin_redmine_omniauth_gitlab['site'] + '/oauth/token'
     )
+
   end
 
   def settings
